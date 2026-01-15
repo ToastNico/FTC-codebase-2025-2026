@@ -15,10 +15,12 @@ public abstract class AutoEngine extends LinearOpMode {
 // goBILDA 48mm Pod: https://www.gobilda.com/swingarm-odometry-pod-48mm-wheel/
     protected final double ODO_WHEEL_DIAMETER_METERS = 0.048;
     protected final double ENCODER_TICKS_PER_REV = 8192; // PPR for SRE Magnetic Encoder
+    //correction factor
+    protected final double DISTANCE_CORRECTION = 1.0204;
 
     // --- AUTO-CALCULATED CONSTANTS ---
     protected final double ODO_WHEEL_CIRCUMFERENCE = ODO_WHEEL_DIAMETER_METERS * Math.PI;
-    protected final double TICKS_PER_METER = ENCODER_TICKS_PER_REV / ODO_WHEEL_CIRCUMFERENCE;
+    protected final double TICKS_PER_METER = (ENCODER_TICKS_PER_REV / ODO_WHEEL_CIRCUMFERENCE) * DISTANCE_CORRECTION;
 
 
     // PID Coefficients
@@ -124,29 +126,101 @@ public abstract class AutoEngine extends LinearOpMode {
     /**
      * Strafe (Left/Right) using Center Deadwheel
      */
-    public void strafePID(double targetMeters, int targetAngle) {
-        double targetTicks = targetMeters * TICKS_PER_METER;
-        double error = targetTicks;
-        resetOdometry();
+    /**
+     * Rotates the robot in place to a specific heading.
+     */
+    public void turnPID(int targetAngle) {
+        // 1. Calculate error
+        double currentYaw = imu.getRobotYawPitchRollAngles().getYaw(AngleUnit.DEGREES);
+        double error = angleWrap(targetAngle - currentYaw);
 
-        while (opModeIsActive() && Math.abs(error) > 50) {
-            double currentPos = centerOdo.getCurrentPosition();
-            error = targetTicks - currentPos;
+        // 2. Loop until error is small (e.g., < 1 degree)
+        while (opModeIsActive() && Math.abs(error) > 1.0) {
+            currentYaw = imu.getRobotYawPitchRollAngles().getYaw(AngleUnit.DEGREES);
+            error = angleWrap(targetAngle - currentYaw);
 
-            double power = (Kp * (error / TICKS_PER_METER)); // Simplified P-loop for strafe
-            double currentYaw = imu.getRobotYawPitchRollAngles().getYaw(AngleUnit.DEGREES);
-            double steer = angleWrap(currentYaw - targetAngle) * -STEER_P;
+            // Simple P-Control for turning
+            // We use a higher P value here because turning needs more punch than steering correction
+            double turnPower = error * 0.03;
 
-            power = Math.max(-0.7, Math.min(0.7, power));
+            // Clamp power to avoid moving too fast or stalling
+            turnPower = Math.max(-0.6, Math.min(0.6, turnPower));
+            if (Math.abs(turnPower) < 0.15) turnPower = Math.signum(turnPower) * 0.15;
 
-            // Strafe power mapping
-            backLeft.setPower(-power + steer);
-            backRight.setPower(-power + steer);
-            frontLeft.setPower(power + steer);
-            frontRight.setPower(-power - steer);
+            // Apply power (Turn Right = Left Forward, Right Back)
+            // Note: Check your motor directions!
+            backLeft.setPower(-turnPower);
+            frontLeft.setPower(-turnPower);
+            backRight.setPower(turnPower);
+            frontRight.setPower(turnPower);
+
+            telemetry.addData("Target", targetAngle);
+            telemetry.addData("Heading", currentYaw);
+            telemetry.update();
         }
         stopRobot();
     }
+
+    /**
+     * REPLACED STRAFE: Turns to the angle, then drives forward.
+     */
+    public void vectorMove(double meters, int heading) {
+        // Step 1: Turn to face the target heading
+        turnPID(heading);
+
+        // Step 2: Drive forward in that direction
+        // We pass 'heading' to drivePID so it maintains that angle while driving
+        drivePID(meters, heading);
+    }
+
+    /**
+     * Drives in an arc.
+     * @param targetMeters Length of the arc path (center of robot)
+     * @param endHeading The angle you want to face at the end
+     */
+    public void driveArc(double targetMeters, int endHeading) {
+        double targetTicks = targetMeters * TICKS_PER_METER;
+        double startHeading = imu.getRobotYawPitchRollAngles().getYaw(AngleUnit.DEGREES);
+        double totalTurnNeeded = angleWrap(endHeading - startHeading);
+
+        resetOdometry();
+
+        double error = targetTicks;
+
+        while (opModeIsActive() && Math.abs(error) > 50) {
+            // 1. Get Distance Progress
+            double currentPos = (leftOdo.getCurrentPosition() + rightOdo.getCurrentPosition()) / 2.0;
+            currentPos = Math.abs(currentPos); // Handle reverse arcs
+
+            // 2. Calculate Dynamic Target Heading
+            // "percentComplete" goes from 0.0 to 1.0
+            double percentComplete = currentPos / Math.abs(targetTicks);
+
+            // If we are 50% through distance, we should be 50% through the turn
+            double currentTargetHeading = startHeading + (totalTurnNeeded * percentComplete);
+
+            // 3. Calculate Drive Power (Standard PID)
+            error = Math.abs(targetTicks) - currentPos;
+            double power = (Kp * (error / TICKS_PER_METER));
+            power = Math.max(-0.7, Math.min(0.7, power));
+            if (Math.abs(power) < MIN_POWER) power = MIN_POWER;
+
+            // 4. Calculate Steer Correction relative to Dynamic Heading
+            double currentYaw = imu.getRobotYawPitchRollAngles().getYaw(AngleUnit.DEGREES);
+            double steer = angleWrap(currentYaw - currentTargetHeading) * -STEER_P;
+
+            // Apply
+            applyDrivePower(power, steer);
+
+            telemetry.addData("Arc Progress", "%.2f", percentComplete);
+            telemetry.addData("Target Head", "%.2f", currentTargetHeading);
+            telemetry.update();
+        }
+        stopRobot();
+    }
+
+
+    /* */
 
     // --- HELPERS ---
 

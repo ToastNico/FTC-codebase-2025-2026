@@ -40,8 +40,8 @@ public class Robot {
 
     public void activateShooters(boolean stop) {
         if(stop) {shooterRight.setPower(0); shooterLeft.setPower(0);} else {
-            shooterLeft.setPower(1);
-            shooterRight.setPower(1);
+            shooterLeft.setPower(0.03);
+            shooterRight.setPower(0.03);
         }
 
     }
