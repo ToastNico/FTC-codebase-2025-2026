@@ -67,10 +67,6 @@ public class driver extends OpMode{
             gobbleOn = gamepad2.left_bumper && !gobbleOn;
             robot.activateGobbler(gobbleOn);
 
-
-
-
-
             shootSequenceOn = gamepad2.triangle;
             if(shootSequenceOn){
                 try {

@@ -37,11 +37,11 @@ public class AprilTagWebcam {
         builder.setCamera(hwMap.get(WebcamName.class, "Webcam 1"));
         builder.setCameraResolution(new Size(640 , 480));
         builder.addProcessor(aprilTagProcessor);
-
+        builder.enableLiveView(true);
         visionPortal = builder.build();
     }
 
-    public void update() {
+    public void update() throws NullPointerException{
         detectedAprilTags = aprilTagProcessor.getDetections();
     }
 
