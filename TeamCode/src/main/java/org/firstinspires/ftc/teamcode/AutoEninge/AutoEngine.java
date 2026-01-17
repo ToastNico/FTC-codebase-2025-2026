@@ -1,12 +1,17 @@
 package org.firstinspires.ftc.teamcode.AutoEninge;
 
-import android.annotation.SuppressLint;
+import static org.firstinspires.ftc.teamcode.AutoEninge.AutoEngine.AutoEngineConfig.MIN_POWER;
+import static org.firstinspires.ftc.teamcode.AutoEninge.AutoEngine.AutoEngineConfig.TICKS_PER_METER;
 
+import com.acmerobotics.dashboard.config.Config;
 import com.qualcomm.hardware.rev.RevHubOrientationOnRobot;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.hardware.DcMotor;
+import com.qualcomm.robotcore.hardware.HardwareMap;
 import com.qualcomm.robotcore.hardware.IMU;
 import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit;
+import org.firstinspires.ftc.teamcode.Vision.AprilTagWebcam;
+import org.firstinspires.ftc.teamcode.Vision.Rotation;
 
 public abstract class AutoEngine extends LinearOpMode {
 
@@ -14,47 +19,52 @@ public abstract class AutoEngine extends LinearOpMode {
     // Calculate: (Ticks per rotation of encoder) / (Circumference of deadwheel)
     // --- ODOMETRY HARDWARE CONSTANTS ---
 // goBILDA 48mm Pod: https://www.gobilda.com/swingarm-odometry-pod-48mm-wheel/
-    protected final double ODO_WHEEL_DIAMETER_METERS = 0.048;//48 mm
-    protected final double ENCODER_TICKS_PER_REV = 2000; // PPR for SRE Magnetic Encoder
-    //correction factor
-    protected final double DISTANCE_CORRECTION = 1.0204;
 
-    // --- AUTO-CALCULATED CONSTANTS ---
-    protected final double ODO_WHEEL_CIRCUMFERENCE = ODO_WHEEL_DIAMETER_METERS * Math.PI;
-    protected final double TICKS_PER_METER = (ENCODER_TICKS_PER_REV / ODO_WHEEL_CIRCUMFERENCE);
+    @Config
+    static class AutoEngineConfig {
+        public static final double ODO_WHEEL_DIAMETER_METERS = 0.048;//48 mm
+        public static final double ENCODER_TICKS_PER_REV = 2000; // PPR for SRE Magnetic Encoder
+        //correction factor
+        public static final double DISTANCE_CORRECTION = 1.0204;
+
+        // --- AUTO-CALCULATED CONSTANTS ---
+        public static final double ODO_WHEEL_CIRCUMFERENCE = ODO_WHEEL_DIAMETER_METERS * Math.PI;
+        public static final double TICKS_PER_METER = (ENCODER_TICKS_PER_REV / ODO_WHEEL_CIRCUMFERENCE);
 
 
-    // PID Coefficients
-    protected double Kp = 0.6;  // Power: how fast it moves toward target
-    protected double Kd = 0; // Dampening: prevents shaking/overshoot
-    protected double Ki = 0.0015; // Integral: handles friction at the very end
+        // PID Coefficients
+        public static double Kp = 0.6;  // Power: how fast it moves toward target
+        public static double Kd = 0; // Dampening: prevents shaking/overshoot
+        public static double Ki = 0.0015; // Integral: handles friction at the very end
 
-    protected double strafe_Kp = 0.8;
-    protected double strafe_Kd = 0;
-    protected double strafe_Ki = 0.0015;
+        public static double strafe_Kp = 0.8;
+        public static double strafe_Kd = 0;
+        public static double strafe_Ki = 0.0015;
 
-    protected final double STEER_P = 0.02; // How aggressively it fixes its angle
-    protected final double MIN_POWER = 0.2; // Minimum power to overcome friction
+        public static final double STEER_P = 0.02; // How aggressively it fixes its angle
+        public static final double MIN_POWER = 0.2; // Minimum power to overcome friction
+    }
 
     // --- HARDWARE ---
     protected DcMotor backLeft, backRight, frontLeft, frontRight;
     protected DcMotor leftOdo, rightOdo, centerOdo; // Deadwheels
     protected IMU imu;
-
+    AprilTagWebcam aprilTagWebcam = new AprilTagWebcam();
 
 
     public abstract void runPath();
 
     @Override
     public void runOpMode() throws InterruptedException {
+        aprilTagWebcam.init(hardwareMap, telemetry);
         // 1. Drivetrain Hardware
-        backLeft   = hardwareMap.get(DcMotor.class, "backLeft");
-        backRight  = hardwareMap.get(DcMotor.class, "backRight");
-        frontLeft  = hardwareMap.get(DcMotor.class, "frontLeft");
+        backLeft = hardwareMap.get(DcMotor.class, "backLeft");
+        backRight = hardwareMap.get(DcMotor.class, "backRight");
+        frontLeft = hardwareMap.get(DcMotor.class, "frontLeft");
         frontRight = hardwareMap.get(DcMotor.class, "frontRight");
 
-        leftOdo   = hardwareMap.get(DcMotor.class, "frontLeft");
-        rightOdo  = hardwareMap.get(DcMotor.class, "backRight");
+        leftOdo = hardwareMap.get(DcMotor.class, "frontLeft");
+        rightOdo = hardwareMap.get(DcMotor.class, "backRight");
         centerOdo = hardwareMap.get(DcMotor.class, "backLeft");
 
         setMotorBehavior();
@@ -74,6 +84,7 @@ public abstract class AutoEngine extends LinearOpMode {
         imu.resetYaw();
 
         if (opModeIsActive()) {
+            aprilTagWebcam.update();
             runPath();
         }
     }
@@ -111,11 +122,11 @@ public abstract class AutoEngine extends LinearOpMode {
                 integral = 0;
             }
 
-            double power = (Kp * (error / TICKS_PER_METER)) + (Ki * integral) + (Kd * derivative);
+            double power = (AutoEngineConfig.Kp * (error / TICKS_PER_METER)) + (AutoEngineConfig.Ki * integral) + (AutoEngineConfig.Kd * derivative);
 
             // Steering with Angle Wrap
             double currentYaw = imu.getRobotYawPitchRollAngles().getYaw(AngleUnit.DEGREES);
-            double steer = angleWrap(currentYaw - targetAngle) * -STEER_P;
+            double steer = angleWrap(currentYaw - targetAngle) * -AutoEngineConfig.STEER_P;
 
             power = Math.max(-0.7, Math.min(0.7, power));
             if (Math.abs(power) < MIN_POWER) power = Math.signum(power) * MIN_POWER;
@@ -181,7 +192,7 @@ public abstract class AutoEngine extends LinearOpMode {
         resetOdometry();
 
         while (opModeIsActive() && Math.abs(error) > maxError) {
-            double currentPos =  centerOdo.getCurrentPosition();
+            double currentPos = centerOdo.getCurrentPosition();
 
             //currentPos = currentPos * -1; // if the odometry pods are mounted backwards
 
@@ -198,11 +209,11 @@ public abstract class AutoEngine extends LinearOpMode {
                 integral = 0;
             }
 
-            double power = (strafe_Kp * (error / TICKS_PER_METER)) + (strafe_Ki * integral) + (strafe_Kd * derivative);
+            double power = (AutoEngineConfig.strafe_Kp * (error / TICKS_PER_METER)) + (AutoEngineConfig.strafe_Ki * integral) + (AutoEngineConfig.strafe_Kd * derivative);
 
             // Steering with Angle Wrap
             double currentYaw = -imu.getRobotYawPitchRollAngles().getYaw(AngleUnit.DEGREES);
-            double steer = angleWrap(currentYaw - targetAngle) * -STEER_P;
+            double steer = angleWrap(currentYaw - targetAngle) * -AutoEngineConfig.STEER_P;
 
             power = Math.max(-0.7, Math.min(0.7, power));
             if (Math.abs(power) < MIN_POWER) power = Math.signum(power) * MIN_POWER;
@@ -221,7 +232,8 @@ public abstract class AutoEngine extends LinearOpMode {
 
     /**
      * Advanced Arc with Keyframes
-     * @param meters Total distance
+     *
+     * @param meters   Total distance
      * @param maxPower Speed cap
      * @param animator The animation instructions
      */
@@ -247,13 +259,13 @@ public abstract class AutoEngine extends LinearOpMode {
 
             // Standard Drive Logic
             double error = Math.abs(targetTicks) - Math.abs(currentPos);
-            double power = (Kp * (error / TICKS_PER_METER));
+            double power = (AutoEngineConfig.Kp * (error / TICKS_PER_METER));
 
             power = Math.max(-maxPower, Math.min(maxPower, power));
             if (Math.abs(power) < MIN_POWER) power = Math.signum(power) * MIN_POWER;
 
             double currentYaw = imu.getRobotYawPitchRollAngles().getYaw(AngleUnit.DEGREES);
-            double steer = angleWrap(currentYaw - targetHeading) * -STEER_P;
+            double steer = angleWrap(currentYaw - targetHeading) * -AutoEngineConfig.STEER_P;
 
             applyDrivePower(power, steer);
 
@@ -275,6 +287,7 @@ public abstract class AutoEngine extends LinearOpMode {
         frontLeft.setPower(p - s);  // Ensure this matches your wiring
         frontRight.setPower(p + s);
     }
+
     private void stopRobot() {
         backLeft.setPower(0);
         backRight.setPower(0);
@@ -287,10 +300,10 @@ public abstract class AutoEngine extends LinearOpMode {
         // Mecanum Strafe Pattern:
         // FrontLeft and BackRight go one way
         // FrontRight and BackLeft go the other way
-        double fl =  strafe + steer;
+        double fl = strafe + steer;
         double fr = -strafe - steer;
         double bl = -strafe + steer;
-        double br =  strafe - steer;
+        double br = strafe - steer;
 
         // Normalize power so no motor exceeds 1.0
         double max = Math.max(Math.abs(fl), Math.max(Math.abs(fr),
@@ -336,7 +349,68 @@ public abstract class AutoEngine extends LinearOpMode {
         return degrees;
     }
 
+
+    class ShootAlignment {
+        //First move to the rough, position of the shooting thing
+        //Then align more accurately
+
+        //TODO remember to convert to 2D
+
+        double alpha = 0;
+        double beta = 0;
+        double gamma = 0;
+        double theta = 0;
+
+        double aSide = 0;
+        double bSide = 0;
+        final double cSide = 1500; //milli meter
+        Robot robot;
+
+        public ShootAlignment(HardwareMap hwMap) {
+            robot = new Robot(hwMap);
+        }
+
+        AprilTagWebcam webcam = new AprilTagWebcam();
+
+
+        public void moveToShoot(Team team) {
+
+            if (team == Team.BLUE) {
+                findData(team);
+                calculateGamma();
+                calculateBeta();
+                calculateAlpha();
+                //First turn towards the april tag
+                double firstTurnAngle = theta + gamma;
+                //turnPID((int) firstTurnAngle); Add this if it does not work
+                drivePID(bSide / 1000, (int) firstTurnAngle);
+
+                double secondAngleTurn = 180 - alpha;
+                turnPID((int) secondAngleTurn);
+
+            }
+        }
+
+        void findData(Team team) {
+            aSide = webcam.getAngle(webcam.getTagBySpecificId(team.getTeamAprilTagID()), Rotation.RANGE);
+            beta = webcam.getAngle(webcam.getTagBySpecificId(team.getTeamAprilTagID()), Rotation.YAW);
+            theta = webcam.getAngle(webcam.getTagBySpecificId(team.getTeamAprilTagID()), Rotation.BEARING);
+        }
+
+        private void calculateGamma() {
+            gamma = Math.pow(Math.cos((Math.pow(aSide, 2) + Math.pow(bSide, 2) - Math.pow(cSide, 2)) / (2 * aSide * bSide)), -1);
+        }
+
+        private void calculateBeta() {
+            bSide = alpha * Math.cos(gamma) + Math.sqrt(
+                    Math.pow(gamma, 2) + Math.pow(beta, 2) * Math.pow(Math.sin(gamma), 2)
+            );
+        }
+
+        private void calculateAlpha() {
+            alpha = 180 - (beta + gamma);
+        }
+    }
 }
 
-// Paste this INSIDE public abstract class AutoEngine
 

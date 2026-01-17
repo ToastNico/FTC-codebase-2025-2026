@@ -6,6 +6,8 @@ import com.qualcomm.robotcore.hardware.DcMotor;
 import com.qualcomm.robotcore.hardware.DcMotorSimple;
 
 import org.firstinspires.ftc.teamcode.AutoEninge.Robot;
+import org.firstinspires.ftc.teamcode.Vision.AprilTagWebcam;
+import org.firstinspires.ftc.vision.apriltag.AprilTagDetection;
 import org.opencv.core.Mat;
 
 @TeleOp(name="Use ME! Driver")
@@ -23,15 +25,25 @@ public class driver extends OpMode{
 
         boolean shootSequenceOn = false;
 
+    AprilTagWebcam aprilTagWebcam = new AprilTagWebcam();
+
         Robot robot;
 
         @Override
         public void init() {
             robot = new Robot(hardwareMap);
+
+            aprilTagWebcam.init(hardwareMap, telemetry);
         }
 
         @Override
         public void loop() {
+            aprilTagWebcam.update();
+
+            AprilTagDetection id20 = aprilTagWebcam.getTagBySpecificId(20);
+            aprilTagWebcam.displayDetectionTelemetry(id20);
+            //telemetry.addData("id20 String", id20.toString());
+
             double leftY = gamepad1.left_stick_y;
             double rightY = gamepad1.right_stick_y;
             double leftX = gamepad1.left_stick_x;
@@ -54,6 +66,10 @@ public class driver extends OpMode{
 
             gobbleOn = gamepad2.left_bumper && !gobbleOn;
             robot.activateGobbler(gobbleOn);
+
+
+
+
 
             shootSequenceOn = gamepad2.triangle;
             if(shootSequenceOn){
