@@ -220,51 +220,50 @@ public abstract class AutoEngine extends LinearOpMode {
     }
 
     /**
-     * Drives in an arc.
-     * @param targetMeters Length of the arc path (center of robot)
-     * @param endHeading The angle you want to face at the end
+     * Advanced Arc with Keyframes
+     * @param meters Total distance
+     * @param maxPower Speed cap
+     * @param animator The animation instructions
      */
-    public void driveArc(double targetMeters, int endHeading) {
-        double targetTicks = targetMeters * TICKS_PER_METER;
+    public void arc(double meters, double maxPower, AnimationBuilder animator) {
+        double targetTicks = meters * TICKS_PER_METER;
         double startHeading = imu.getRobotYawPitchRollAngles().getYaw(AngleUnit.DEGREES);
-        double totalTurnNeeded = angleWrap(endHeading - startHeading);
+
+        // 1. Setup the Timeline
+        HeadingTimeline timeline = new HeadingTimeline();
+        animator.build(timeline); // Execute the user's instructions
 
         resetOdometry();
 
-        double error = targetTicks;
-
-        while (opModeIsActive() && Math.abs(error) > 50) {
-            // 1. Get Distance Progress
+        while (opModeIsActive()) {
             double currentPos = (leftOdo.getCurrentPosition() + rightOdo.getCurrentPosition()) / 2.0;
-            currentPos = Math.abs(currentPos); // Handle reverse arcs
 
-            // 2. Calculate Dynamic Target Heading
-            // "percentComplete" goes from 0.0 to 1.0
-            double percentComplete = currentPos / Math.abs(targetTicks);
+            // Calculate Progress (0.0 to 1.0)
+            double progress = Math.abs(currentPos / targetTicks);
+            if (progress >= 1.0) break;
 
-            // If we are 50% through distance, we should be 50% through the turn
-            double currentTargetHeading = startHeading + (totalTurnNeeded * percentComplete);
+            // 2. ASK THE TIMELINE FOR HEADING
+            double targetHeading = timeline.getTarget(progress, startHeading);
 
-            // 3. Calculate Drive Power (Standard PID)
-            error = Math.abs(targetTicks) - currentPos;
+            // Standard Drive Logic
+            double error = Math.abs(targetTicks) - Math.abs(currentPos);
             double power = (Kp * (error / TICKS_PER_METER));
-            power = Math.max(-0.7, Math.min(0.7, power));
-            if (Math.abs(power) < MIN_POWER) power = MIN_POWER;
 
-            // 4. Calculate Steer Correction relative to Dynamic Heading
+            power = Math.max(-maxPower, Math.min(maxPower, power));
+            if (Math.abs(power) < MIN_POWER) power = Math.signum(power) * MIN_POWER;
+
             double currentYaw = imu.getRobotYawPitchRollAngles().getYaw(AngleUnit.DEGREES);
-            double steer = angleWrap(currentYaw - currentTargetHeading) * -STEER_P;
+            double steer = angleWrap(currentYaw - targetHeading) * -STEER_P;
 
-            // Apply
             applyDrivePower(power, steer);
 
-            telemetry.addData("Arc Progress", "%.2f", percentComplete);
-            telemetry.addData("Target Head", "%.2f", currentTargetHeading);
+            // Telemetry for debugging
+            telemetry.addData("Progress", "%.2f", progress);
+            telemetry.addData("Target Head", "%.1f", targetHeading);
             telemetry.update();
         }
         stopRobot();
     }
-
 
     /* */
 
@@ -338,3 +337,6 @@ public abstract class AutoEngine extends LinearOpMode {
     }
 
 }
+
+// Paste this INSIDE public abstract class AutoEngine
+
