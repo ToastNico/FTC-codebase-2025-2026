@@ -1,8 +1,8 @@
 package org.firstinspires.ftc.teamcode.AutoEninge;
 
-import static org.firstinspires.ftc.teamcode.AutoEninge.AutoEngine.AutoEngineConfig.Kp;
-import static org.firstinspires.ftc.teamcode.AutoEninge.AutoEngine.AutoEngineConfig.MIN_POWER;
-import static org.firstinspires.ftc.teamcode.AutoEninge.AutoEngine.AutoEngineConfig.TICKS_PER_METER;
+import static org.firstinspires.ftc.teamcode.AutoEninge.MovementEngine.AutoEngineConfig.Kp;
+import static org.firstinspires.ftc.teamcode.AutoEninge.MovementEngine.AutoEngineConfig.MIN_POWER;
+import static org.firstinspires.ftc.teamcode.AutoEninge.MovementEngine.AutoEngineConfig.TICKS_PER_METER;
 
 import com.acmerobotics.dashboard.config.Config;
 import com.qualcomm.hardware.rev.RevHubOrientationOnRobot;
@@ -14,7 +14,7 @@ import org.firstinspires.ftc.teamcode.Vision.AprilTagWebcam;
 import org.firstinspires.ftc.teamcode.Vision.Rotation;
 import org.firstinspires.ftc.vision.apriltag.AprilTagDetection;
 
-public abstract class AutoEngine extends LinearOpMode {
+public abstract class MovementEngine extends LinearOpMode {
 
     // --- CONFIGURATION ---
     @Config
@@ -94,7 +94,7 @@ public abstract class AutoEngine extends LinearOpMode {
 
     // --- YOUR RESTORED LOGIC ---
 
-    // Fixed: Now inside AutoEngine, so it can access drivePID and turnPID directly
+    // Fixed: Now inside MovementEngine, so it can access drivePID and turnPID directly
     public void moveToShoot(Team team) {
         aprilTagWebcam.update();
         if(aprilTagWebcam.getDetectedTags() == null) return;

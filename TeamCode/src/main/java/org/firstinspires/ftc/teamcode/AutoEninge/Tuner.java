@@ -1,6 +1,6 @@
 package org.firstinspires.ftc.teamcode.AutoEninge;
 
-public class Tuner extends AutoEngine{
+public class Tuner extends MovementEngine {
     public Tuner() {
         super();
     }
