@@ -28,6 +28,8 @@ public class Robot {
 
     IMU imu;
 
+    volatile boolean pleaseWait = false;
+
     int TICKS_PER_REV_COREHEX = 288;
 
     public Robot(HardwareMap hwMap) {
@@ -49,9 +51,9 @@ public class Robot {
         gobbler = hwMap.get(DcMotor.class, "gobbler");
         gobbler.setDirection(DcMotorSimple.Direction.REVERSE);
 
-       // ballColorSensor = hwMap.get(ColorSensor.class , "ballCSensor");
+        ballColorSensor = hwMap.get(ColorSensor.class , "colorSensor");
 
-//        lifter = hwMap.get(Servo.class, "lifter");
+        lifter = hwMap.get(Servo.class, "lifter");
 
         imu = hwMap.get(IMU.class, "imu");
         imu.initialize(new IMU.Parameters(new RevHubOrientationOnRobot(
@@ -63,7 +65,7 @@ public class Robot {
 
         if(stop) {shooterRight.setPower(0); shooterLeft.setPower(0);} else {
             shooterLeft.setPower(0.55);
-            shooterRight.setPower(0.55);
+            shooterRight.setPower(-0.55);
         }
 
     }
@@ -119,37 +121,38 @@ public class Robot {
         this.drive(newForward, newStrafe, rotate);
     }
 
-    public void rotateByAngle(DcMotorEx motor, double angle, double power) {
-        // Determine how many ticks are needed for the requested angle
+    public void rotateByAngle(DcMotorEx motor, double angle, double power) throws InterruptedException {
         int targetTicks = (int) ((angle / 360.0) * TICKS_PER_REV_COREHEX);
-
-        // Set target relative to the CURRENT position
         int newTarget = motor.getCurrentPosition() + targetTicks;
+
         motor.setTargetPosition(newTarget);
-
-        // Switch to RUN_TO_POSITION mode
         motor.setMode(DcMotor.RunMode.RUN_TO_POSITION);
-
-        // Start moving
         motor.setPower(Math.abs(power));
 
-
-        // Stop the motor once reached
+       sleep(800);
+        // Now that the loop is finished, it's safe to stop
         motor.setPower(0);
-
-        // Optional: Return to regular run mode
         motor.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
     }
     public void shootSequence() throws InterruptedException {
 
+
         activateShooters(false);
         sleep(1000);
         for(int i = 0; i < 3; i++) {
-            rotateByAngle((DcMotorEx) indexer, 120, 0.5);
+            lifter.setPosition(-0.8);
+            sleep(1000);
             lifter.setPosition(1);
             sleep(500);
-            lifter.setPosition(0);
+            rotateByAngle((DcMotorEx) indexer, -120, 0.6);
+            sleep(1000);
+
+
         }
+
+
+
+
         activateShooters(true);
     }
 
