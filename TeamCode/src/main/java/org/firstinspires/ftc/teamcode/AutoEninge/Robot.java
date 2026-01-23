@@ -73,8 +73,8 @@ public class Robot {
             shooterRight.setPower(0);
             shooterLeft.setPower(0);
         } else {
-            shooterLeft.setPower(0.52);
-            shooterRight.setPower(-0.52);
+            shooterLeft.setPower(0.62);
+            shooterRight.setPower(-0.62);
         }
     }
 
@@ -148,6 +148,7 @@ public class Robot {
         // Wait until motor is done moving
         while (indexer.isBusy()) {
             // efficient wait
+
         }
 
         indexer.setPower(0);
@@ -162,12 +163,12 @@ public class Robot {
         rotateIndexer(60,IndexerRotation.CLOCKWISE);  // move from gobble indexer alignment to shooting alignment
 
         activateShooters(false);
-        sleep(1000);
+        sleep(1500);
 
         // Shot 1
-        sleep(1000);
+        sleep(1500);
         lifter.setPosition(-0.8);
-        sleep(500);
+        sleep(1000);
         lifter.setPosition(1);
         sleep(500);
 
@@ -175,9 +176,9 @@ public class Robot {
         rotateIndexer(indexAngle, IndexerRotation.CLOCKWISE);
 
         // Shot 2
-        sleep(1000);
+        sleep(1500);
         lifter.setPosition(-0.8);
-        sleep(500);
+        sleep(1000);
         lifter.setPosition(1);
         sleep(500);
 
@@ -185,9 +186,9 @@ public class Robot {
         rotateIndexer(indexAngle, IndexerRotation.CLOCKWISE);
 
         // Shot 3
-        sleep(1000);
+        sleep(1500);
         lifter.setPosition(-0.8);
-        sleep(500);
+        sleep(1000);
         lifter.setPosition(1);
         sleep(500);
 

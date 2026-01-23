@@ -9,6 +9,8 @@ import com.qualcomm.hardware.rev.RevHubOrientationOnRobot;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.hardware.DcMotor;
 import com.qualcomm.robotcore.hardware.IMU;
+import com.qualcomm.robotcore.util.ElapsedTime;
+
 import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit;
 import org.firstinspires.ftc.teamcode.Vision.AprilTagWebcam;
 import org.firstinspires.ftc.teamcode.Vision.Rotation;
@@ -28,7 +30,7 @@ public abstract class MovementEngine extends LinearOpMode {
 
         public static double Kp = 0.6;
         public static double Kd = 0;
-        public static double Ki = 0.0015;
+        public static double Ki = 0;
 
         // FIXED: Set strafe coefficients to non-zero values
         public static double strafe_Kp = 0.6;
@@ -37,6 +39,8 @@ public abstract class MovementEngine extends LinearOpMode {
 
         public static final double STEER_P = 0.02;
         public static final double MIN_POWER = 0.1;
+
+        public static double timeoutSecs = 4;
     }
 
     protected DcMotor backLeft, backRight, frontLeft, frontRight;
@@ -52,11 +56,15 @@ public abstract class MovementEngine extends LinearOpMode {
     private double bSide = 0;
     private final double cSide = 150;
 
-    public abstract void runPath();
+    public Robot robot;
+
+    public abstract void runPath() throws InterruptedException;
 
     @Override
     public void runOpMode() throws InterruptedException {
         aprilTagWebcam.init(hardwareMap, telemetry);
+
+        robot = new Robot(hardwareMap);
 
         backLeft = hardwareMap.get(DcMotor.class, "backLeft");
         backRight = hardwareMap.get(DcMotor.class, "backRight");
@@ -81,6 +89,7 @@ public abstract class MovementEngine extends LinearOpMode {
 
         if (opModeIsActive()) {
             aprilTagWebcam.update();
+            telemetry.update();
             runPath();
         }
     }
@@ -131,38 +140,73 @@ public abstract class MovementEngine extends LinearOpMode {
 
     private void calculateAlpha() { alpha = 180 - (theta + gamma); }
 
+    public void activateShooters() throws InterruptedException {robot.shootSequence();}
+
     /**
      * Move the robot forward while using a pid/gyro correction
      * @param targetMeters distance to travel in meters
-     * @param targetAngle angle to turn to in degrees*/
-
+     * @param targetAngle angle to turn to in degrees
+     */
     public void drivePID(double targetMeters, int targetAngle) {
         double targetTicks = targetMeters * TICKS_PER_METER;
+
+        // 1. SAFE START: Calculate start position instead of resetting hardware
+        // resetting hardware encoders can be slow/laggy in loops
+        double startPos = ((leftOdo.getCurrentPosition() + rightOdo.getCurrentPosition()) / 2.0);
+
         double error = targetTicks;
         double lastError = 0;
         double integral = 0;
 
-        resetOdometry();
+        // 2. TIMEOUT: Prevent infinite loops if sensors fail
+        ElapsedTime timer = new ElapsedTime();
+        timer.reset();
 
-        while (opModeIsActive() && Math.abs(error) > 50) {
-                // FIXED: Removed the - sign that was causing infinite driving
-            double currentPos = (leftOdo.getCurrentPosition() + rightOdo.getCurrentPosition()) / 2.0;
+        while (opModeIsActive() && (timer.seconds() < AutoEngineConfig.timeoutSecs) && Math.abs(error) > 50) {
+
+            // Calculate current distance traveled relative to start
+            double rawCurrentPos = ((leftOdo.getCurrentPosition() + rightOdo.getCurrentPosition()) / 2.0) * -1;
+            double currentPos = rawCurrentPos - startPos;
+
+            // 3. DEBUGGING: If this number goes NEGATIVE when driving FORWARD,
+            // you must reverse your encoder direction in the config or code.
+
             error = targetTicks - currentPos;
 
             double derivative = error - lastError;
-            integral += (Math.abs(error) < (0.1 * TICKS_PER_METER)) ? error : 0;
 
-            double power = (Kp * (error / TICKS_PER_METER)) + (AutoEngineConfig.Ki * integral) + (AutoEngineConfig.Kd * derivative);
+            // Integral anti-windup (only accumulate when close to target)
+            if (Math.abs(error) < (0.1 * TICKS_PER_METER)) {
+                integral += error;
+            } else {
+                integral = 0;
+            }
 
-            // FIXED: Standardized steering logic to prevent the 90-degree spin
+            double power = (AutoEngineConfig.Kp * (error / TICKS_PER_METER))
+                    + (AutoEngineConfig.Ki * integral)
+                    + (AutoEngineConfig.Kd * derivative);
+
+            // Steering logic
             double currentYaw = imu.getRobotYawPitchRollAngles().getYaw(AngleUnit.DEGREES);
             double steer = angleWrap(targetAngle - currentYaw) * AutoEngineConfig.STEER_P;
 
+            // Clamp power
             power = Math.max(-0.7, Math.min(0.7, power));
-            if (Math.abs(power) < MIN_POWER) power = Math.signum(power) * MIN_POWER;
+
+            // Feedforward / Minimum power to overcome friction
+            if (Math.abs(power) < AutoEngineConfig.MIN_POWER && Math.abs(error) > 50) {
+                power = Math.signum(power) * AutoEngineConfig.MIN_POWER;
+            }
 
             applyDrivePower(power, steer);
             lastError = error;
+
+            // 4. TELEMETRY: Essential for seeing WHY it won't stop
+            telemetry.addData("Target Ticks", targetTicks);
+            telemetry.addData("Current Pos", currentPos);
+            telemetry.addData("Error", error);
+            telemetry.addData("Power", power);
+            telemetry.update();
         }
         stopRobot();
     }
