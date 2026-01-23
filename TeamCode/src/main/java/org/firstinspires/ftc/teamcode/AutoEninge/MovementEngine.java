@@ -36,7 +36,7 @@ public abstract class MovementEngine extends LinearOpMode {
         public static double strafe_Kd = 0;
 
         public static final double STEER_P = 0.02;
-        public static final double MIN_POWER = 0.2;
+        public static final double MIN_POWER = 0.1;
     }
 
     protected DcMotor backLeft, backRight, frontLeft, frontRight;

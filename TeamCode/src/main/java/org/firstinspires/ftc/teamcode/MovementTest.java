@@ -10,12 +10,17 @@ public class MovementTest extends MovementEngine {
     @Override
     public void runPath() {
 
-        drivePID(3.5, 80);
-        turnPID(95);
-        moveToShoot(Team.BLUE);
+        // Generated Path (robot-oriented)
+        // Start: x=0.00 y=0.00 h=0.0deg
 
-        arc(4, 0.6, t -> t
-                .at(0.3, 10));
+        turnPID(0); // face start heading
+        turnPID(-146);
+        drivePID(1.23, -146);
+        turnPID(-128); // waypoint heading
+        turnPID(36);
+        drivePID(2.53, 36);
+        turnPID(91); // waypoint heading
+
 
     }
 }
