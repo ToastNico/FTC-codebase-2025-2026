@@ -73,7 +73,7 @@ public class Robot {
             shooterRight.setPower(0);
             shooterLeft.setPower(0);
         } else {
-            shooterLeft.setPower(0.48);
+            shooterLeft.setPower(0.48    );
             shooterRight.setPower(-0.48);
         }
     }

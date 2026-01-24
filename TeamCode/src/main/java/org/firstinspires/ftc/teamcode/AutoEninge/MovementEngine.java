@@ -212,7 +212,7 @@ public abstract class MovementEngine extends LinearOpMode {
 
             // Steering logic
             double currentYaw = imu.getRobotYawPitchRollAngles().getYaw(AngleUnit.DEGREES);
-            double steer = angleWrap(targetAngle - currentYaw) * STEER_P;
+            double steer = angleWrap(targetAngle - currentYaw) * AutoEngineConfig.STEER_P;
 
             // Clamp power
             power = Math.max(-0.7, Math.min(0.7, power));
@@ -222,17 +222,19 @@ public abstract class MovementEngine extends LinearOpMode {
                 power = Math.signum(power) * AutoEngineConfig.MIN_POWER;
             }
 
-            applyDrivePower(power, steer);
+            applyDrivePower(power, -steer);
             lastError = error;
 
             // 4. TELEMETRY: Essential for seeing WHY it won't stop
-//            telemetry.addData("Target Ticks", targetTicks);
-//            telemetry.addData("Current Pos", currentPos);
-//            telemetry.addData("Error", error);
-//            telemetry.addData("Power", power);
+            telemetry.addData("Target Ticks", targetTicks);
+            telemetry.addData("Current Pos", currentPos);
+            telemetry.addData("Error", error);
+            telemetry.addData("Power", power);
+            telemetry.update();
         }
         stopRobot();
     }
+
 
     /**
      * Move the robot sideways while using a pid/gyro correction
